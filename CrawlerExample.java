@@ -50,7 +50,22 @@ public class CrawlerExample {
     }
 
     public static void main(String[] args) throws InterruptedException {
-        System.setProperty("webdriver.chrome.driver", "/opt/homebrew/bin/chromedriver");
+    	
+    	String os = System.getProperty("os.name").toLowerCase();
+    	String driverPath;
+
+    	if (os.contains("win")) {
+    	    driverPath = "drivers/chromedriver.exe";
+    	} else if (os.contains("mac")) {
+    	    driverPath = "drivers/chromedriver_mac";  // 파일명 구분해서 저장
+    	} else if (os.contains("nux")) {  // Linux: ubuntu, debian 등
+    	    driverPath = "drivers/chromedriver_linux";
+    	} else {
+    	    throw new RuntimeException("지원하지 않는 운영체제입니다.");
+    	}
+
+    	System.setProperty("webdriver.chrome.driver", driverPath);
+    	
         Scanner scanner = new Scanner(System.in);
 
         ChromeOptions options = new ChromeOptions();
