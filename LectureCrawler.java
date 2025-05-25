@@ -1,5 +1,3 @@
-package basicWeb;
-
 import org.openqa.selenium.*;
 import org.openqa.selenium.chrome.ChromeDriver;
 import org.openqa.selenium.chrome.ChromeOptions;
@@ -63,7 +61,7 @@ public class LectureCrawler {
             WebElement tbody = wait.until(ExpectedConditions.presenceOfElementLocated(By.xpath("//tbody[@id='grid01_body_tbody']")));
             List<WebElement> rows = tbody.findElements(By.tagName("tr"));
 
-            int headerLength = LanguageChange.getHeaders("Korean").length;
+            int headerLength = LanguageChange.getHeaders().length;
 
             for (WebElement row : rows) {
                 List<WebElement> cells = row.findElements(By.tagName("td"));
@@ -81,6 +79,13 @@ public class LectureCrawler {
                         rowData[i] = "";
                     }
                 }
+                
+                // 평점 넣기 (course = 교과목명, professor = 담당교수)
+                String course = rowData[8].toString();     // "교과목명"
+                String professor = rowData[12].toString(); // "담당교수"
+                Double rating = RatingLoader.getRating(course, professor);
+                rowData[headerLength - 1] = (rating != null) ? String.format("%.2f", rating) : "-";
+                
                 tableModel.addRow(rowData);
             }
 
