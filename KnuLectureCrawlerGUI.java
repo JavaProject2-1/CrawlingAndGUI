@@ -6,98 +6,96 @@ import java.awt.*;
 
 public class KnuLectureCrawlerGUI extends JFrame {
     JTextField yearField;
-    JComboBox<String> semesterCombo;
-    JTextField subjectField;
+    JTextField semesterField;
+    JTextField gradeField;
     JButton searchBtn, saveBtn;
     JTable resultTable;
     DefaultTableModel tableModel;
     JLabel statusLabel;
-    JComboBox<String> langCombo;
-    JLabel yearLabel, semesterLabel, subjectLabel, languageLabel;
+    JLabel yearLabel, semesterLabel, gradeLabel;
 
-    public KnuLectureCrawlerGUI() {
+    public KnuLectureCrawlerGUI(int sequence) {
         setTitle("KNU 강의 계획서 크롤러");
         setSize(1200, 600);
         setDefaultCloseOperation(EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
 
+        RatingLoader.loadRatings();
         initComponents();
+        Language.applyKoreanLabels(this, sequence);
     }
 
     private void initComponents() {
         JPanel topPanel = new JPanel();
 
-        yearLabel = new JLabel("개설연도:");
+        // 개설연도
+        yearLabel = new JLabel();
         topPanel.add(yearLabel);
-        yearField = new JTextField("2025", 6);
+        yearField = new JTextField("", 6);
         topPanel.add(yearField);
 
-        semesterLabel = new JLabel("개설학기:");
+        // 학년
+        gradeLabel = new JLabel();
+        topPanel.add(gradeLabel);
+        gradeField = new JTextField("", 4);
+        topPanel.add(gradeField);
+
+        // 학기
+        semesterLabel = new JLabel();
         topPanel.add(semesterLabel);
-        semesterCombo = new JComboBox<>(new String[]{"1학기", "2학기", "계절학기(하계)", "계절학기(동계)"});
-        semesterCombo.setSelectedItem("계절학기(하계)");
-        topPanel.add(semesterCombo);
+        semesterField = new JTextField("", 8);
+        topPanel.add(semesterField);
 
-        subjectLabel = new JLabel("교과목명:");
-        topPanel.add(subjectLabel);
-        subjectField = new JTextField("공학수학", 10);
-        topPanel.add(subjectField);
-
-        searchBtn = new JButton("검색");
-        saveBtn = new JButton("저장(.txt)");
+        // 버튼
+        searchBtn = new JButton();
         topPanel.add(searchBtn);
-        topPanel.add(saveBtn);
 
-        statusLabel = new JLabel("대기 중...");
+        // 상태
+        statusLabel = new JLabel();
         topPanel.add(statusLabel);
-
-        languageLabel = new JLabel("언어:");
-        topPanel.add(languageLabel);
-        langCombo = new JComboBox<>(new String[]{"한국어", "English"});
-        topPanel.add(langCombo);
 
         add(topPanel, BorderLayout.NORTH);
 
-        tableModel = new DefaultTableModel(LanguageChange.getHeaders("Korean"), 0);
+        // 테이블
+        tableModel = new DefaultTableModel(LanguageChange.getKoreanHeaders(), 0);
         resultTable = new JTable(tableModel);
         add(new JScrollPane(resultTable), BorderLayout.CENTER);
 
+        // 검색 버튼 이벤트
         searchBtn.addActionListener(e -> new Thread(() -> {
             searchBtn.setEnabled(false);
             tableModel.setRowCount(0);
             statusLabel.setText("검색 중...");
-            LectureCrawler.searchLectures(yearField.getText().trim(),
-                    (String) semesterCombo.getSelectedItem(),
-                    subjectField.getText().trim(),
+            LectureCrawler.searchLectures(
+                    yearField.getText().trim(),
+                    semesterField.getText().trim(),
+                    gradeField.getText().trim(),
                     tableModel,
                     statusLabel,
                     searchBtn);
         }).start());
 
-        saveBtn.addActionListener(e -> FileExporter.exportTableToTxt(this, tableModel));
-
-        langCombo.addActionListener(e -> {
-            String selectedLang = langCombo.getSelectedItem().toString();
-            Language.changeLanguage(this, selectedLang.equals("English") ? "English" : "한국어");
+        // 셀 클릭 팝업
+        resultTable.addMouseListener(new java.awt.event.MouseAdapter() {
+            @Override
+            public void mouseClicked(java.awt.event.MouseEvent evt) {
+                int row = resultTable.rowAtPoint(evt.getPoint());
+                int col = resultTable.columnAtPoint(evt.getPoint());
+                if (row >= 0 && col >= 0) {
+                    Object value = resultTable.getValueAt(row, col);
+                    if (value != null) {
+                        JOptionPane.showMessageDialog(KnuLectureCrawlerGUI.this,
+                                value.toString(),
+                                "셀 내용 보기",
+                                JOptionPane.INFORMATION_MESSAGE);
+                    }
+                }
+            }
         });
     }
 
-    public void updateLanguage(String title, String searchText, String saveText, String statusText,
-                                String yearLabelText, String semesterLabelText, String subjectLabelText,
-                                String languageLabelText, String[] headers) {
-        setTitle(title);
-        searchBtn.setText(searchText);
-        saveBtn.setText(saveText);
-        statusLabel.setText(statusText);
-        yearLabel.setText(yearLabelText);
-        semesterLabel.setText(semesterLabelText);
-        subjectLabel.setText(subjectLabelText);
-        languageLabel.setText(languageLabelText);
-
-        tableModel.setColumnIdentifiers(headers);
-    }
-
     public static void main(String[] args) {
-        SwingUtilities.invokeLater(() -> new KnuLectureCrawlerGUI().setVisible(true));
+        RatingLoader.loadRatings();
+        SwingUtilities.invokeLater(() -> new KnuLectureCrawlerGUI(0).setVisible(true));
     }
 }
