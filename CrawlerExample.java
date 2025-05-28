@@ -1,5 +1,3 @@
-package Crawler;
-
 import org.openqa.selenium.*;
 import org.openqa.selenium.chrome.ChromeDriver;
 import org.openqa.selenium.chrome.ChromeOptions;
@@ -7,9 +5,14 @@ import org.openqa.selenium.support.ui.*;
 
 import java.time.Duration;
 import java.util.*;
-import java.util.NoSuchElementException;
 
 public class CrawlerExample {
+
+    private static List<String> uniqueSubjectNames;
+
+    public static List<String> getUniqueSubjectNames() {
+        return uniqueSubjectNames;
+    }
 
     public static String getCellText(WebElement cell) {
         try {
@@ -20,7 +23,7 @@ public class CrawlerExample {
                 return textWithNewlines.replaceAll("<[^>]+>", "").trim();
             }
             return cell.getText().trim();
-        } catch (NoSuchElementException e) {
+        } catch (org.openqa.selenium.NoSuchElementException e) {
             return cell.getText().trim();
         }
     }
@@ -49,28 +52,20 @@ public class CrawlerExample {
         return code + "|" + name + "|" + professor + "|" + time;
     }
 
-    public static void main(String[] args) throws InterruptedException {
-    	
-    	String os = System.getProperty("os.name").toLowerCase();
-    	String driverPath;
+    public static List<String> collectUniqueSubjectNames(List<DetailedSubject> detailedSubjects) {
+        Set<String> seenNames = new LinkedHashSet<>();
+        for (DetailedSubject ds : detailedSubjects) {
+            seenNames.add(ds.name);
+        }
+        return new ArrayList<>(seenNames);
+    }
 
-    	if (os.contains("win")) {
-    	    driverPath = "drivers/chromedriver.exe";
-    	} else if (os.contains("mac")) {
-    	    driverPath = "drivers/chromedriver_mac";  // 파일명 구분해서 저장
-    	} else if (os.contains("nux")) {  // Linux: ubuntu, debian 등
-    	    driverPath = "drivers/chromedriver_linux";
-    	} else {
-    	    throw new RuntimeException("지원하지 않는 운영체제입니다.");
-    	}
-
-    	System.setProperty("webdriver.chrome.driver", driverPath);
-    	
+    public static void main(String[] args) {
+        System.setProperty("webdriver.chrome.driver", "C:/JAVA_WORKSPACE/chromedriver-win64/chromedriver.exe");
         Scanner scanner = new Scanner(System.in);
 
         ChromeOptions options = new ChromeOptions();
         options.addArguments("--disable-gpu");
-
         WebDriver driver = new ChromeDriver(options);
 
         try {
@@ -133,7 +128,7 @@ public class CrawlerExample {
             }
 
             driver.get("https://knuin.knu.ac.kr/public/stddm/lectPlnInqr.knu");
-            WebDriverWait wait2 = new WebDriverWait(driver, Duration.ofSeconds(20));
+            WebDriverWait wait2 = new WebDriverWait(driver, Duration.ofSeconds(15));
             JavascriptExecutor js = (JavascriptExecutor) driver;
 
             List<DetailedSubject> detailedSubjects = new ArrayList<>();
@@ -141,11 +136,11 @@ public class CrawlerExample {
 
             for (int idx = 0; idx < filtered.size(); idx++) {
                 Subject s = filtered.get(idx);
-                driver.navigate().refresh();
-                wait2.until(ExpectedConditions.presenceOfElementLocated(By.id("schEstblYear___input")));
 
+                wait2.until(ExpectedConditions.presenceOfElementLocated(By.id("schEstblYear___input")));
                 WebElement yearInput = driver.findElement(By.id("schEstblYear___input"));
-                js.executeScript("arguments[0].value=arguments[1];", yearInput, inputYearFull);
+                yearInput.clear();
+                yearInput.sendKeys(inputYearFull);
 
                 WebElement semesterSelect = wait2.until(ExpectedConditions.elementToBeClickable(By.cssSelector("select[title='개설학기']")));
                 new Select(semesterSelect).selectByVisibleText(s.semester);
@@ -162,32 +157,22 @@ public class CrawlerExample {
 
                 wait2.until(ExpectedConditions.presenceOfElementLocated(By.xpath("//tbody[@id='grid01_body_tbody']/tr[1]")));
 
-                Thread.sleep(1000);
-
-                WebElement scrollDiv = driver.findElement(By.id("grid01_scrollY_div"));
-                Number scrollHeightNum = (Number) js.executeScript("return arguments[0].scrollHeight;", scrollDiv);
-                double scrollHeight = scrollHeightNum.doubleValue();
-
-                Number clientHeightNum = (Number) js.executeScript("return arguments[0].clientHeight;", scrollDiv);
-                double clientHeight = clientHeightNum.doubleValue();
+                WebElement scrollDiv = wait2.until(ExpectedConditions.presenceOfElementLocated(By.id("grid01_scrollY_div")));
+                double scrollHeight = ((Number) js.executeScript("return arguments[0].scrollHeight;", scrollDiv)).doubleValue();
+                double clientHeight = ((Number) js.executeScript("return arguments[0].clientHeight;", scrollDiv)).doubleValue();
 
                 double scrollTop = 0;
-                double increment = 150;
+                double increment = 200;
                 boolean newCourseFound;
-                boolean isLastSubject = (idx == filtered.size() - 1);
 
                 do {
                     js.executeScript("arguments[0].scrollTop = arguments[1];", scrollDiv, scrollTop);
-                    Thread.sleep(800);
+                    Thread.sleep(400); // 줄임
 
                     List<WebElement> rows = driver.findElements(By.xpath("//tbody[@id='grid01_body_tbody']/tr"));
-
-                    int rowsToProcess = isLastSubject ? rows.size() : Math.max(0, rows.size() - 1);
-
                     newCourseFound = false;
 
-                    for (int i = 0; i < rowsToProcess; i++) {
-                        WebElement row = rows.get(i);
+                    for (WebElement row : rows) {
                         List<WebElement> cells = row.findElements(By.tagName("td"));
                         if (cells.size() < 17) continue;
 
@@ -195,36 +180,32 @@ public class CrawlerExample {
                         if (!uniqueCourses.contains(key)) {
                             uniqueCourses.add(key);
 
-                            // 학년 정보 (colindex=3)
                             year = getCellText(cells.get(3));
                             String code = getCellText(cells.get(7));
                             String lectureTime = getCellText(cells.get(13));
                             String classroom = getCellText(cells.get(15));
                             String roomNumber = getCellText(cells.get(16));
-                            String professor = getCellText(cells.get(12)); 
+                            String professor = getCellText(cells.get(12));
 
-                            DetailedSubject detailedSubject = new DetailedSubject(
-                                    year, s.semester, s.division,
-                                    code, s.name, s.isRequired, s.isDesign, s.credit,
-                                    professor, lectureTime, classroom, roomNumber
+                            DetailedSubject ds = new DetailedSubject(
+                                    year, s.semester, s.division, code, s.name,
+                                    s.isRequired, s.isDesign, s.credit, professor,
+                                    lectureTime, classroom, roomNumber
                             );
-
-                            detailedSubjects.add(detailedSubject);
+                            detailedSubjects.add(ds);
                             newCourseFound = true;
                         }
                     }
 
                     if (scrollTop + clientHeight >= scrollHeight) break;
-
-                    scrollTop = Math.min(scrollTop + increment, scrollHeight - clientHeight);
+                    scrollTop += increment;
                 } while (newCourseFound);
-
-                Thread.sleep(1000);
             }
 
-            System.out.println("\n=== 상세 강의계획서 정보 ===");
-            for (DetailedSubject ds : detailedSubjects) {
-                System.out.println(ds.getFormattedInfo());
+            System.out.println("\n=== 과목명 목록 ===");
+            uniqueSubjectNames = collectUniqueSubjectNames(detailedSubjects);
+            for (String name : uniqueSubjectNames) {
+                System.out.println(name);
             }
 
         } catch (Exception e) {
