@@ -1,5 +1,3 @@
-package Crawler;
-
 import org.openqa.selenium.*;
 import org.openqa.selenium.chrome.ChromeDriver;
 import org.openqa.selenium.chrome.ChromeOptions;
@@ -7,9 +5,16 @@ import org.openqa.selenium.support.ui.*;
 
 import java.time.Duration;
 import java.util.*;
-import java.util.NoSuchElementException;
 
 public class CrawlerExample {
+
+    // 중복 제거된 과목명을 저장하는 전역 리스트
+    private static List<String> uniqueSubjectNames;
+
+    // 외부에서 저장된 과목명 목록을 가져오는 getter
+    public static List<String> getUniqueSubjectNames() {
+        return uniqueSubjectNames;
+    }
 
     public static String getCellText(WebElement cell) {
         try {
@@ -20,7 +25,7 @@ public class CrawlerExample {
                 return textWithNewlines.replaceAll("<[^>]+>", "").trim();
             }
             return cell.getText().trim();
-        } catch (NoSuchElementException e) {
+        } catch (org.openqa.selenium.NoSuchElementException e) {
             return cell.getText().trim();
         }
     }
@@ -49,23 +54,17 @@ public class CrawlerExample {
         return code + "|" + name + "|" + professor + "|" + time;
     }
 
+    // DetailedSubject 리스트에서 과목명을 중복 없이 수집해 반환하는 함수
+    public static List<String> collectUniqueSubjectNames(List<DetailedSubject> detailedSubjects) {
+        Set<String> seenNames = new LinkedHashSet<>();
+        for (DetailedSubject ds : detailedSubjects) {
+            seenNames.add(ds.name);
+        }
+        return new ArrayList<>(seenNames);
+    }
+
     public static void main(String[] args) throws InterruptedException {
-    	
-    	String os = System.getProperty("os.name").toLowerCase();
-    	String driverPath;
-
-    	if (os.contains("win")) {
-    	    driverPath = "drivers/chromedriver.exe";
-    	} else if (os.contains("mac")) {
-    	    driverPath = "drivers/chromedriver_mac";  // 파일명 구분해서 저장
-    	} else if (os.contains("nux")) {  // Linux: ubuntu, debian 등
-    	    driverPath = "drivers/chromedriver_linux";
-    	} else {
-    	    throw new RuntimeException("지원하지 않는 운영체제입니다.");
-    	}
-
-    	System.setProperty("webdriver.chrome.driver", driverPath);
-    	
+        System.setProperty("webdriver.chrome.driver", "C:/JAVA_WORKSPACE/chromedriver-win64/chromedriver.exe");
         Scanner scanner = new Scanner(System.in);
 
         ChromeOptions options = new ChromeOptions();
@@ -181,9 +180,7 @@ public class CrawlerExample {
                     Thread.sleep(800);
 
                     List<WebElement> rows = driver.findElements(By.xpath("//tbody[@id='grid01_body_tbody']/tr"));
-
                     int rowsToProcess = isLastSubject ? rows.size() : Math.max(0, rows.size() - 1);
-
                     newCourseFound = false;
 
                     for (int i = 0; i < rowsToProcess; i++) {
@@ -195,13 +192,12 @@ public class CrawlerExample {
                         if (!uniqueCourses.contains(key)) {
                             uniqueCourses.add(key);
 
-                            // 학년 정보 (colindex=3)
                             year = getCellText(cells.get(3));
                             String code = getCellText(cells.get(7));
                             String lectureTime = getCellText(cells.get(13));
                             String classroom = getCellText(cells.get(15));
                             String roomNumber = getCellText(cells.get(16));
-                            String professor = getCellText(cells.get(12)); 
+                            String professor = getCellText(cells.get(12));
 
                             DetailedSubject detailedSubject = new DetailedSubject(
                                     year, s.semester, s.division,
@@ -215,16 +211,17 @@ public class CrawlerExample {
                     }
 
                     if (scrollTop + clientHeight >= scrollHeight) break;
-
                     scrollTop = Math.min(scrollTop + increment, scrollHeight - clientHeight);
                 } while (newCourseFound);
 
                 Thread.sleep(1000);
             }
 
-            System.out.println("\n=== 상세 강의계획서 정보 ===");
-            for (DetailedSubject ds : detailedSubjects) {
-                System.out.println(ds.getFormattedInfo());
+            System.out.println("\n=== 과목명 목록 ===");
+            // 전역 변수에 저장 (외부에서도 접근 가능하게 하기 위해)
+            uniqueSubjectNames = collectUniqueSubjectNames(detailedSubjects);
+            for (String name : uniqueSubjectNames) {
+                System.out.println(name);
             }
 
         } catch (Exception e) {
