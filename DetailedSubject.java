@@ -1,4 +1,4 @@
-package Crawler;
+package basicWeb;
 
 public class DetailedSubject extends Subject {
     public String professor;
