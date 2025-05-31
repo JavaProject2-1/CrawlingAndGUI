@@ -1,4 +1,4 @@
-package Crawler;
+package basicWeb;
 
 public class Subject {
     public String year, semester, division, code, name, credit;
@@ -15,3 +15,4 @@ public class Subject {
         this.credit = credit;
     }
 }
+
