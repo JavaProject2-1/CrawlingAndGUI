@@ -1,14 +1,20 @@
 package basicWeb;
 
 import javax.swing.*;
+import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
+import javax.swing.table.TableCellRenderer;
+
 import java.awt.*;
+import java.awt.font.FontRenderContext;
+import java.awt.geom.AffineTransform;
+import java.util.List;
 
 public class KnuLectureCrawlerGUI extends JFrame {
     JTextField yearField;
-    JTextField semesterField;
-    JTextField gradeField;
-    JButton searchBtn, saveBtn;
+    JComboBox<String> semesterCombo;
+    JComboBox<String> gradeCombo;
+    JButton searchBtn;
     JTable resultTable;
     DefaultTableModel tableModel;
     JLabel statusLabel;
@@ -20,7 +26,6 @@ public class KnuLectureCrawlerGUI extends JFrame {
         setDefaultCloseOperation(EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
 
-        RatingLoader.loadRatings();
         initComponents();
         Language.applyKoreanLabels(this, sequence);
     }
@@ -28,66 +33,93 @@ public class KnuLectureCrawlerGUI extends JFrame {
     private void initComponents() {
         JPanel topPanel = new JPanel();
 
-        // 개설연도
-        yearLabel = new JLabel();
+        yearLabel = new JLabel("개설년도:");
         topPanel.add(yearLabel);
         yearField = new JTextField("", 6);
         topPanel.add(yearField);
 
-        // 학년
-        gradeLabel = new JLabel();
+        gradeLabel = new JLabel("학년:");
         topPanel.add(gradeLabel);
-        gradeField = new JTextField("", 4);
-        topPanel.add(gradeField);
+        gradeCombo = new JComboBox<>(new String[]{"1", "2", "3", "4"});
+        topPanel.add(gradeCombo);
 
-        // 학기
-        semesterLabel = new JLabel();
+        semesterLabel = new JLabel("학기:");
         topPanel.add(semesterLabel);
-        semesterField = new JTextField("", 8);
-        topPanel.add(semesterField);
+        semesterCombo = new JComboBox<>(new String[]{"1학기", "2학기", "계절학기(하계)", "계절학기(동계)"});
+        topPanel.add(semesterCombo);
 
-        // 버튼
-        searchBtn = new JButton();
+        searchBtn = new JButton("검색");
         topPanel.add(searchBtn);
 
-        // 상태
-        statusLabel = new JLabel();
+        statusLabel = new JLabel("Ready");
         topPanel.add(statusLabel);
 
         add(topPanel, BorderLayout.NORTH);
 
-        // 테이블
-        tableModel = new DefaultTableModel(LanguageChange.getKoreanHeaders(), 0);
+        tableModel = new DefaultTableModel(LanguageChange.getHeaders(0), 0) {
+            @Override
+            public Class<?> getColumnClass(int columnIndex) {
+                if (columnIndex == 0) return Boolean.class; // 체크박스 열
+                return super.getColumnClass(columnIndex);
+            }
+
+            @Override
+            public boolean isCellEditable(int row, int column) {
+                return column == 0; // 체크박스 열만 편집 가능
+            }
+        };
+
         resultTable = new JTable(tableModel);
         add(new JScrollPane(resultTable), BorderLayout.CENTER);
 
-        // 검색 버튼 이벤트
+        DefaultTableCellRenderer centerRenderer = new DefaultTableCellRenderer();
+        centerRenderer.setHorizontalAlignment(SwingConstants.CENTER);
+        SwingUtilities.invokeLater(() -> {
+            for (int i = 1; i < resultTable.getColumnCount(); i++) {
+                resultTable.getColumnModel().getColumn(i).setCellRenderer(centerRenderer);
+            }
+        });
+
         searchBtn.addActionListener(e -> new Thread(() -> {
             searchBtn.setEnabled(false);
             tableModel.setRowCount(0);
             statusLabel.setText("검색 중...");
-            LectureCrawler.searchLectures(
-                    yearField.getText().trim(),
-                    semesterField.getText().trim(),
-                    gradeField.getText().trim(),
-                    tableModel,
-                    statusLabel,
-                    searchBtn);
+            try {
+                List<Object[]> rows = CrawlerExample.getLectureRowData(
+                        yearField.getText().trim(),
+                        gradeCombo.getSelectedItem().toString(),
+                        semesterCombo.getSelectedItem().toString()
+                );
+                for (Object[] row : rows) {
+                    tableModel.addRow(row);
+                }
+                statusLabel.setText("검색 완료: 전체 " + rows.size() + "개 과목");
+            } catch (Exception ex) {
+                ex.printStackTrace();
+                statusLabel.setText("오류 발생: " + ex.getMessage());
+            } finally {
+                searchBtn.setEnabled(true);
+            }
         }).start());
 
-        // 셀 클릭 팝업
         resultTable.addMouseListener(new java.awt.event.MouseAdapter() {
             @Override
             public void mouseClicked(java.awt.event.MouseEvent evt) {
                 int row = resultTable.rowAtPoint(evt.getPoint());
                 int col = resultTable.columnAtPoint(evt.getPoint());
-                if (row >= 0 && col >= 0) {
+                if (row >= 0 && col >= 0 && col != 0) {
                     Object value = resultTable.getValueAt(row, col);
                     if (value != null) {
-                        JOptionPane.showMessageDialog(KnuLectureCrawlerGUI.this,
-                                value.toString(),
-                                "셀 내용 보기",
-                                JOptionPane.INFORMATION_MESSAGE);
+                        TableCellRenderer renderer = resultTable.getCellRenderer(row, col);
+                        Component comp = renderer.getTableCellRendererComponent(resultTable, value, false, false, row, col);
+                        Font font = comp.getFont();
+                        FontRenderContext frc = new FontRenderContext(new AffineTransform(), true, true);
+                        int textWidth = (int) font.getStringBounds(value.toString(), frc).getWidth();
+                        int columnWidth = resultTable.getColumnModel().getColumn(col).getWidth();
+                        if (textWidth > columnWidth) {
+                            JOptionPane.showMessageDialog(KnuLectureCrawlerGUI.this,
+                                    value.toString(), "셀 내용 보기", JOptionPane.INFORMATION_MESSAGE);
+                        }
                     }
                 }
             }
@@ -95,7 +127,6 @@ public class KnuLectureCrawlerGUI extends JFrame {
     }
 
     public static void main(String[] args) {
-        RatingLoader.loadRatings();
         SwingUtilities.invokeLater(() -> new KnuLectureCrawlerGUI(0).setVisible(true));
     }
 }
