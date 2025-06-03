@@ -69,7 +69,8 @@ public class Curriculum {
                         if (ths.size() == 2) {
                             year = ths.get(0).getText().trim();
                             division = ths.get(1).getText().trim();
-                        } else if (ths.size() == 1) {
+                        } 
+                        else if (ths.size() == 1) {
                             String txt = ths.get(0).getText().trim();
                             if (txt.matches("\\d")) year = txt;
                             else division = txt;
@@ -95,13 +96,13 @@ public class Curriculum {
 
             if (subjectCount == 0) {
                 System.out.println("❌ 저장된 과목이 없습니다. 필터 조건 또는 HTML 구조를 확인하세요.");
-            } else {
+            } 
+            else {
                 System.out.println("✅ 저장된 과목 수: " + subjectCount);
                 for (int i = 0; i < subjectCount; i++) {
                     System.out.println(subjects[i]);
                 }
             }
-
         } catch (Exception e) {
             e.printStackTrace();
         } finally {
