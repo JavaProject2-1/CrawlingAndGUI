@@ -11,7 +11,7 @@ import java.time.Duration;
 import java.util.*;
 
 /**
- * 강의 상세 정보를 크롤링하는 서비스 클래스
+ * 교과목 정보를 크롤링하는 서비스 클래스
  */
 public class CrawlerExample {
     
@@ -64,82 +64,24 @@ public class CrawlerExample {
     }
 
     /**
-     * 크롬 드라이버 설정 (운영체제별 자동 감지)
+     * 교과과정 페이지에서 교과목 정보 크롤링
      */
-    private static void setupChromeDriver() {
-        String os = System.getProperty("os.name").toLowerCase();
-        String driverPath;
-
-        if (os.contains("win")) {
-            driverPath = "chromedriver.exe";
-        } else if (os.contains("mac")) {
-            driverPath = "chromedriver_mac";
-        } else if (os.contains("nux") || os.contains("nix")) {
-            driverPath = "chromedriver_linux";
-        } else {
-            throw new RuntimeException("지원하지 않는 운영체제입니다: " + os);
-        }
-
-        String absolutePath = Paths.get(driverPath).toAbsolutePath().toString();
-        File driverFile = new File(absolutePath);
-
-        if (!driverFile.exists()) {
-            throw new RuntimeException("크롬 드라이버 파일을 찾을 수 없습니다: " + absolutePath);
-        }
-
-        if (!os.contains("win")) {
-            if (!driverFile.canExecute()) {
-                driverFile.setExecutable(true);
-            }
-        }
-    }
-
-    /**
-     * 교과과정 페이지에서 기본 교과목 정보 크롤링
-     */
-    private static List<Subject> crawlCurriculumSubjects() {
+    public static List<Subject> crawlCurriculumSubjects(String inputYearFull, String inputYear, String inputSemester) {
+        // 크롬 드라이버 설정
         setupChromeDriver();
         
         ChromeOptions options = new ChromeOptions();
         options.addArguments("--disable-gpu");
         WebDriver driver = new ChromeDriver(options);
 
-        List<Subject> allSubjects = new ArrayList<>();
+        List<Subject> subjectList = new ArrayList<>();
 
         try {
             driver.get("https://cse.knu.ac.kr/sub3_2_b.php");
             WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(10));
             wait.until(ExpectedConditions.presenceOfElementLocated(By.tagName("tbody")));
 
-            String year = "", division = "";
-
-            for (WebElement tbody : driver.findElements(By.tagName("tbody"))) {
-                for (WebElement row : tbody.findElements(By.tagName("tr"))) {
-                    List<WebElement> ths = row.findElements(By.tagName("th"));
-                    List<WebElement> tds = row.findElements(By.tagName("td"));
-
-                    if (!ths.isEmpty()) {
-                        if (ths.size() == 2) {
-                            year = ths.get(0).getText().trim();
-                            division = ths.get(1).getText().trim();
-                        } else if (ths.size() == 1) {
-                            String txt = ths.get(0).getText().trim();
-                            if (txt.matches("\\d")) year = txt;
-                            else division = txt;
-                        }
-                    }
-                    if (year.isEmpty()) continue;
-
-                    if (tds.size() >= 3) {
-                        Subject sub = parseSubject(year, "1학기", division, tds.get(0), tds.get(1), tds.get(2));
-                        if (sub != null) allSubjects.add(sub);
-                    }
-                    if (tds.size() >= 6) {
-                        Subject sub = parseSubject(year, "2학기", division, tds.get(3), tds.get(4), tds.get(5));
-                        if (sub != null) allSubjects.add(sub);
-                    }
-                }
-            }
+            subjectList = extractSubjectsFromPage(driver, inputYear, inputSemester);
 
         } catch (Exception e) {
             e.printStackTrace();
@@ -147,13 +89,17 @@ public class CrawlerExample {
             driver.quit();
         }
 
-        return allSubjects;
+        return subjectList;
     }
 
     /**
-     * 강의 상세 정보 크롤링
+     * 선택된 과목들의 상세 정보 크롤링
      */
-    private static List<DetailedSubject> crawlDetailedLectureInfo(List<Subject> filteredSubjects, String inputYearFull) {
+    public static List<DetailedSubject> crawlSelectedSubjectsDetail(List<Subject> selectedSubjects, String inputYearFull) {
+        if (selectedSubjects.isEmpty()) {
+            return new ArrayList<>();
+        }
+
         setupChromeDriver();
         
         ChromeOptions options = new ChromeOptions();
@@ -168,10 +114,12 @@ public class CrawlerExample {
             WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(20));
             JavascriptExecutor js = (JavascriptExecutor) driver;
 
-            for (int idx = 0; idx < filteredSubjects.size(); idx++) {
-                Subject s = filteredSubjects.get(idx);
+            for (int idx = 0; idx < selectedSubjects.size(); idx++) {
+                Subject s = selectedSubjects.get(idx);
                 
                 try {
+                    System.out.println("처리 중: " + s.getName() + " (" + (idx + 1) + "/" + selectedSubjects.size() + ")");
+                    
                     driver.navigate().refresh();
                     wait.until(ExpectedConditions.presenceOfElementLocated(By.id("schEstblYear___input")));
 
@@ -210,7 +158,7 @@ public class CrawlerExample {
                     double scrollTop = 0;
                     double increment = 150;
                     boolean newCourseFound;
-                    boolean isLastSubject = (idx == filteredSubjects.size() - 1);
+                    boolean isLastSubject = (idx == selectedSubjects.size() - 1);
 
                     do {
                         js.executeScript("arguments[0].scrollTop = arguments[1];", scrollDiv, scrollTop);
@@ -267,55 +215,93 @@ public class CrawlerExample {
 
         return detailedSubjects;
     }
-
+    
     /**
-     * 강의 상세 정보가 담긴 배열을 반환하는 메인 함수
-     * @param inputYearFull 개설년도 (예: "2025")
-     * @param inputYear 학년 (예: "1")
-     * @param inputSemester 학기 (예: "1학기", "2학기", "계절학기(하계)", "계절학기(동계)")
-     * @return DetailedSubject 배열
+     * 웹페이지에서 교과목 정보 추출
      */
-    public static DetailedSubject[] getDetailedLectureInfo(String inputYearFull, String inputYear, String inputSemester) {
-        try {
-            System.out.println("교과과정 정보를 가져오는 중...");
-            
-            // 1단계: 기본 교과목 정보 크롤링
-            List<Subject> allSubjects = crawlCurriculumSubjects();
-            System.out.println("총 커리큘럼 과목 수: " + allSubjects.size());
+    private static List<Subject> extractSubjectsFromPage(WebDriver driver, String inputYear, String inputSemester) {
+        List<Subject> subjectList = new ArrayList<>();
+        String year = "", division = "";
 
-            // 2단계: 조건에 맞는 과목 필터링
-            List<Subject> filteredSubjects = new ArrayList<>();
-            for (Subject s : allSubjects) {
-                if (s.getYear().equals(inputYear) && s.getSemester().equals(inputSemester)) {
-                    filteredSubjects.add(s);
+        for (WebElement tbody : driver.findElements(By.tagName("tbody"))) {
+            for (WebElement row : tbody.findElements(By.tagName("tr"))) {
+                List<WebElement> ths = row.findElements(By.tagName("th"));
+                List<WebElement> tds = row.findElements(By.tagName("td"));
+
+                // 학년과 구분 정보 추출
+                if (!ths.isEmpty()) {
+                    if (ths.size() == 2) {
+                        year = ths.get(0).getText().trim();
+                        division = ths.get(1).getText().trim();
+                    } else if (ths.size() == 1) {
+                        String txt = ths.get(0).getText().trim();
+                        if (txt.matches("\\d")) year = txt;
+                        else division = txt;
+                    }
+                }
+
+                if (year.isEmpty()) continue;
+
+                // 1학기 과목 처리
+                if (tds.size() >= 3) {
+                    Subject s = parseSubject(year, "1학기", division, tds.get(0), tds.get(1), tds.get(2));
+                    if (s != null && s.getYear().equals(inputYear) && s.getSemester().equals(inputSemester)) {
+                        subjectList.add(s);
+                    }
+                }
+
+                // 2학기 과목 처리
+                if (tds.size() >= 6) {
+                    Subject s = parseSubject(year, "2학기", division, tds.get(3), tds.get(4), tds.get(5));
+                    if (s != null && s.getYear().equals(inputYear) && s.getSemester().equals(inputSemester)) {
+                        subjectList.add(s);
+                    }
                 }
             }
-
-            System.out.println("선택한 " + inputYear + "학년 " + inputSemester + " 과목 수: " + filteredSubjects.size());
-
-            if (filteredSubjects.isEmpty()) {
-                System.out.println("선택한 조건에 해당하는 과목이 없습니다.");
-                return new DetailedSubject[0];
-            }
-
-            // 3단계: 상세 강의 정보 크롤링
-            System.out.println("상세 강의 정보를 가져오는 중...");
-            List<DetailedSubject> detailedSubjects = crawlDetailedLectureInfo(filteredSubjects, inputYearFull);
-
-            System.out.println("상세 정보 수집 완료: " + detailedSubjects.size() + "개 강의");
-
-            // List를 배열로 변환하여 반환
-            return detailedSubjects.toArray(new DetailedSubject[0]);
-
-        } catch (Exception e) {
-            System.err.println("강의 정보 수집 중 오류 발생: " + e.getMessage());
-            e.printStackTrace();
-            return new DetailedSubject[0];
         }
+        
+        return subjectList;
+    }
+    
+    /**
+     * 크롬 드라이버 설정 (운영체제별 자동 감지)
+     */
+    private static void setupChromeDriver() {
+        String os = System.getProperty("os.name").toLowerCase();
+        String driverPath;
+
+        // 운영체제별 드라이버 경로 설정
+        if (os.contains("win")) driverPath = "chromedriver.exe";
+        else if (os.contains("mac")) driverPath = "chromedriver_mac";
+        else if (os.contains("nux") || os.contains("nix")) driverPath = "chromedriver_linux"; // Linux, Unix
+        else throw new RuntimeException("지원하지 않는 운영체제입니다: " + os);
+
+        // 절대 경로로 변환
+        String absolutePath = Paths.get(driverPath).toAbsolutePath().toString();
+        File driverFile = new File(absolutePath);
+
+        // 파일 존재 여부 확인
+        if (!driverFile.exists()) {
+            throw new RuntimeException("크롬 드라이버 파일을 찾을 수 없습니다: " + absolutePath +
+                    "\n다음 경로에 해당 운영체제용 크롬 드라이버를 배치해주세요.");
+        }
+
+        // Unix 계열 시스템에서 실행 권한 설정
+        if (!os.contains("win")) {
+            if (!driverFile.canExecute()) {
+                boolean success = driverFile.setExecutable(true);
+                if (!success) {
+                    System.err.println("경고: 드라이버 파일에 실행 권한을 설정할 수 없습니다: " + absolutePath);
+                }
+            }
+        }
+
+        // 시스템 속성 설정
+        System.setProperty("webdriver.chrome.driver", absolutePath);
     }
 
     /**
-     * 교과목 리스트를 테이블 행 데이터로 변환 (기본 정보용)
+     * 교과목 리스트를 테이블 행 데이터로 변환
      */
     public static List<Object[]> convertSubjectsToRows(List<Subject> subjects) {
         List<Object[]> rowList = new ArrayList<>();
@@ -333,13 +319,12 @@ public class CrawlerExample {
     }
 
     /**
-     * 상세 교과목 리스트를 테이블 행 데이터로 변환 (상세 정보용)
+     * 상세 교과목 리스트를 테이블 행 데이터로 변환
      */
-    public static List<Object[]> convertDetailedSubjectsToRows(DetailedSubject[] detailedSubjects) {
+    public static List<Object[]> convertDetailedSubjectsToRows(List<DetailedSubject> detailedSubjects) {
         List<Object[]> rowList = new ArrayList<>();
         for (DetailedSubject ds : detailedSubjects) {
             Object[] row = new Object[] {
-                false,                          // 선택
                 ds.getName(),                   // 교과목명
                 ds.getCode(),                   // 교과목코드
                 ds.getProfessor(),              // 담당교수
@@ -356,18 +341,11 @@ public class CrawlerExample {
     }
     
     /**
-     * 강의 정보를 테이블 행 데이터로 가져오기 (기본 정보)
+     * 강의 정보를 테이블 행 데이터로 가져오기
      */
     public static List<Object[]> getLectureRowData(String yearFull, String grade, String semester) {
-        List<Subject> allSubjects = crawlCurriculumSubjects();
-        List<Subject> filteredSubjects = new ArrayList<>();
-        
-        for (Subject s : allSubjects) {
-            if (s.getYear().equals(grade) && s.getSemester().equals(semester)) {
-                filteredSubjects.add(s);
-            }
-        }
-        
-        return convertSubjectsToRows(filteredSubjects);
+        List<Subject> subjects = crawlCurriculumSubjects(yearFull, grade, semester);
+        return convertSubjectsToRows(subjects);
     }
 }
+	
