@@ -1,10 +1,11 @@
-package Crawler;
+package basicWeb;
 
 import org.openqa.selenium.*;
 import org.openqa.selenium.chrome.ChromeDriver;
-import org.openqa.selenium.support.ui.ExpectedConditions;
-import org.openqa.selenium.support.ui.WebDriverWait;
+import org.openqa.selenium.support.ui.*;
 
+import java.io.File;
+import java.nio.file.Paths;
 import java.time.Duration;
 
 public class Curriculum {
@@ -33,15 +34,20 @@ public class Curriculum {
 
         @Override
         public String toString() {
-            return String.format("%s학년 %s [%s] %s - %s, 필수: %s, 설계: %s, 학점: %s",
-                    year, semester, division, code, name, isRequired, isDesign, credit);
+            return String.format("%s학년 %s [%s] %s - %s, 필수: %s, 설계: %s, 학점: %s", year, semester, division, code, name, isRequired, isDesign, credit);
         }
     }
 
     public static void main(String[] args) {
-        System.setProperty("webdriver.chrome.driver", "/opt/homebrew/bin/chromedriver");
-        WebDriver driver = new ChromeDriver();
+        // ✅ chromedriver 자동 경로 설정
+        String currentPath = Paths.get("").toAbsolutePath().toString();
+        String driverPath = currentPath + File.separator + "chromedriver";
+        if (System.getProperty("os.name").toLowerCase().contains("win")) {
+            driverPath += ".exe";
+        }
+        System.setProperty("webdriver.chrome.driver", driverPath);
 
+        WebDriver driver = new ChromeDriver();
         Subject[] subjects = new Subject[500];
         int subjectCount = 0;
 
@@ -69,8 +75,8 @@ public class Curriculum {
                             else division = txt;
                         }
                     }
-                    if(year.equals("")) {
-                    	continue;
+                    if (year.equals("")) {
+                        continue;
                     }
 
                     // 왼쪽 셀 = 1학기
