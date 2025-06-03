@@ -348,4 +348,3 @@ public class CrawlerExample {
         return convertSubjectsToRows(subjects);
     }
 }
-	
