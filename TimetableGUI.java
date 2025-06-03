@@ -1,4 +1,4 @@
-package timeGUI;
+package basicWeb;
 
 import javax.swing.*;
 import java.awt.*;
@@ -16,7 +16,7 @@ public class TimetableGUI extends JFrame {
         }
 
         setTitle("2025 시간표");
-        setSize(1000, 1000);
+        setSize(1000, 700);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
         setLayout(new BorderLayout());
@@ -71,18 +71,14 @@ public class TimetableGUI extends JFrame {
             }
         }
 
-        // 고정된 과목
-        addSubject("시스템프로그래밍", "류은정", "IT대학5호관(IT8)", 2, 1, 8, new Color(204, 255, 255));
-        addSubject("자바프로그래밍", "정창수", "IT대학5호관(IT8)", 3, 1, 8, new Color(204, 229, 255));
-        addSubject("알고리즘실습", "배준현", "IT대학5호관(IT8)", 4, 1, 8, new Color(255, 255, 204));
-        addSubject("물리학Ⅰ", "김창독", "IT대학5호관(IT8)", 1, 4, 3, new Color(255, 204, 204));
-        addSubject("물리학Ⅰ", "김창독", "IT대학5호관(IT8)", 5, 1, 3, new Color(255, 204, 204));
-        addSubject("확률및통계", "김진욱", "IT대학5호관(IT8)", 1, 10, 3, new Color(255, 230, 230));
-        addSubject("확률및통계", "김진욱", "IT대학5호관(IT8)", 3, 13, 3, new Color(255, 230, 230));
-        addSubject("컴퓨터구조", "김명석", "IT대학5호관(IT8)", 2, 10, 3, new Color(230, 255, 230));
-        addSubject("컴퓨터구조", "김명석", "IT대학5호관(IT8)", 4, 13, 3, new Color(230, 255, 230));
-
-        add(timetablePanel, BorderLayout.CENTER);
+        // JScrollPane 추가
+        JScrollPane scrollPane = new JScrollPane(timetablePanel);
+        scrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED);
+        scrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
+        scrollPane.getVerticalScrollBar().setUnitIncrement(16);
+        scrollPane.getHorizontalScrollBar().setUnitIncrement(16);
+        
+        add(scrollPane, BorderLayout.CENTER);
         setVisible(true);
     }
 
@@ -150,6 +146,15 @@ public class TimetableGUI extends JFrame {
         timetablePanel.setComponentZOrder(subject, 0);
 
         gbc.gridheight = 1;
+    }
+
+    /**
+     * 외부에서 과목을 추가할 수 있는 public 메서드
+     */
+    public void addSubjectToTable(String name, String prof, String place, int col, int row, int height, Color color) {
+        addSubject(name, prof, place, col, row, height, color);
+        timetablePanel.revalidate();
+        timetablePanel.repaint();
     }
 
     public static void main(String[] args) {
