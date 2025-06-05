@@ -7,6 +7,8 @@ import org.openqa.selenium.support.ui.*;
 
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
+import java.io.File;
+import java.nio.file.Paths;
 import java.time.Duration;
 import java.util.List;
 
@@ -23,13 +25,50 @@ public class LectureCrawler {
         }
     }
 
+    /**
+     * 크롬 드라이버 설정 (운영체제별 자동 감지)
+     */
+    private static void setupChromeDriver() {
+        String os = System.getProperty("os.name").toLowerCase();
+        String driverPath;
+
+        // 운영체제별 드라이버 경로 설정
+        if (os.contains("win")) driverPath = "chromedriver.exe";
+        else if (os.contains("mac")) driverPath = "chromedriver_mac";
+        else if (os.contains("nux") || os.contains("nix")) driverPath = "chromedriver_linux"; // Linux, Unix
+        else throw new RuntimeException("지원하지 않는 운영체제입니다: " + os);
+
+        // 절대 경로로 변환
+        String absolutePath = Paths.get(driverPath).toAbsolutePath().toString();
+        File driverFile = new File(absolutePath);
+
+        // 파일 존재 여부 확인
+        if (!driverFile.exists()) {
+            throw new RuntimeException("크롬 드라이버 파일을 찾을 수 없습니다: " + absolutePath +
+                    "\n다음 경로에 해당 운영체제용 크롬 드라이버를 배치해주세요.");
+        }
+
+        // Unix 계열 시스템에서 실행 권한 설정
+        if (!os.contains("win")) {
+            if (!driverFile.canExecute()) {
+                boolean success = driverFile.setExecutable(true);
+                if (!success) {
+                    System.err.println("경고: 드라이버 파일에 실행 권한을 설정할 수 없습니다: " + absolutePath);
+                }
+            }
+        }
+
+        // 시스템 속성 설정
+        System.setProperty("webdriver.chrome.driver", absolutePath);
+    }
+
     public static void searchLectures(String year, String semester, String subject,
                                       DefaultTableModel tableModel, JLabel statusLabel, JButton searchBtn) {
 
-        System.setProperty("webdriver.chrome.driver", "C://KNU_Lecture//2-1//Java_Pro//chromedriver-win64//chromedriver.exe");
+        // 크롬 드라이버 자동 설정
+        setupChromeDriver();
 
         ChromeOptions options = new ChromeOptions();
-        options.addArguments("--headless");
         options.addArguments("--disable-gpu");
 
         WebDriver driver = new ChromeDriver(options);
@@ -81,6 +120,13 @@ public class LectureCrawler {
                         rowData[i] = "";
                     }
                 }
+                
+                // 평점 넣기 (course = 교과목명, professor = 담당교수)
+                String course = rowData[8].toString();     // "교과목명"
+                String professor = rowData[12].toString(); // "담당교수"
+                Double rating = RatingLoader.getRating(course, professor);
+                rowData[headerLength - 1] = (rating != null) ? String.format("%.2f", rating) : "-";
+                
                 tableModel.addRow(rowData);
             }
 
@@ -88,6 +134,7 @@ public class LectureCrawler {
 
         } catch (Exception e) {
             statusLabel.setText("오류 발생: " + e.getMessage());
+            e.printStackTrace();
         } finally {
             driver.quit();
             searchBtn.setEnabled(true);

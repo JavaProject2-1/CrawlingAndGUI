@@ -10,7 +10,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 상세 강의 정보를 표시하는 새 창
+ * 상세 강의 정보를 표시하는 새 창 (상세 정보 크롤링 개선)
  */
 public class DetailedLectureWindow extends JFrame {
     private JTable detailTable;
@@ -614,7 +614,7 @@ public class DetailedLectureWindow extends JFrame {
     }
 
     /**
-     * 강의를 시간표에 추가
+     * 강의를 시간표에 추가 (실제 시간 정보 포함)
      */
     private boolean addSubjectToTimetable(DetailedSubject subject) {
         List<TimeSlot> timeSlots = parseTimeSlots(subject.getLectureTime());
@@ -663,10 +663,12 @@ public class DetailedLectureWindow extends JFrame {
             System.out.println("계산 과정: 시작슬롯=" + startSlot + ", 종료슬롯=" + endSlot);
             System.out.println("시작시간=" + startHour + ":" + startMinute + ", 종료시간=" + endHour + ":" + endMinute);
             
-            timetableGUI.addSubjectToTable(subject.getName(), subject.getProfessor(), subject.getClassroom(), dayIndex + 1, row, height, subjectColor);
+            // 실제 시간 정보 포함하여 추가
+            String timeInfo = slot.getStartTime() + "~" + slot.getEndTime();
+            timetableGUI.addSubjectToTableWithTime(subject.getName(), subject.getProfessor(), subject.getClassroom(), dayIndex + 1, row, height, subjectColor, timeInfo);
             added = true;
             
-            System.out.println("시간표에 추가됨: " + subject.getName() + " - " + slot.getDay() + " " + slot.getStartTime() + "~" + slot.getEndTime() + " (색깔: " + subjectColor + ")");
+            System.out.println("시간표에 추가됨: " + subject.getName() + " - " + slot.getDay() + " " + timeInfo + " (색깔: " + subjectColor + ")");
         }
         
         return added;

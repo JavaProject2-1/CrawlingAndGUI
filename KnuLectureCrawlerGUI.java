@@ -25,6 +25,7 @@ public class KnuLectureCrawlerGUI extends JFrame {
     private JLabel statusLabel;
     private JLabel yearLabel, semesterLabel, gradeLabel;
     private List<Subject> currentSubjects; // 현재 검색된 과목들을 저장
+    private TimetableGUI timetableGUI; // 시간표 GUI 참조
 
     /**
      * 생성자
@@ -32,13 +33,21 @@ public class KnuLectureCrawlerGUI extends JFrame {
     public KnuLectureCrawlerGUI(int sequence) {
         setTitle("KNU 강의 계획서 크롤러");
         setSize(1200, 600);
-        setDefaultCloseOperation(EXIT_ON_CLOSE);
+        setDefaultCloseOperation(DISPOSE_ON_CLOSE); // 창을 닫아도 프로그램이 종료되지 않도록 변경
         setLocationRelativeTo(null);
         
         currentSubjects = new ArrayList<>();
 
         initComponents();
         LanguageChange.applyKoreanLabels(this, sequence);
+    }
+    
+    /**
+     * 시간표 GUI 참조를 받는 생성자
+     */
+    public KnuLectureCrawlerGUI(int sequence, TimetableGUI timetableGUI) {
+        this(sequence);
+        this.timetableGUI = timetableGUI;
     }
 
     /**
@@ -65,6 +74,9 @@ public class KnuLectureCrawlerGUI extends JFrame {
         
         // 테이블 셀 클릭 이벤트 설정
         setupTableClickEvent();
+        
+        // 기본값 설정
+        yearField.setText("2025");
     }
     
     /**
@@ -193,10 +205,7 @@ public class KnuLectureCrawlerGUI extends JFrame {
                 return;
             }
             
-            // 시간표 GUI 생성 (한 번만)
-            TimetableGUI timetableGUI = new TimetableGUI();
-            
-            // 상세 정보 창 생성 및 표시 (시간표 참조 전달)
+            // 시간표 GUI 참조 전달
             DetailedLectureWindow detailWindow = new DetailedLectureWindow(timetableGUI);
             detailWindow.setVisible(true);
             
